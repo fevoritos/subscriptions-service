@@ -16,6 +16,11 @@ var (
 	ErrInternalServerError = errors.New("internal server error")
 )
 
+// ErrorResponse describes an API error payload.
+type ErrorResponse struct {
+	Error string `json:"error" example:"invalid request"`
+}
+
 type SubscriptionHandler struct {
 	log     *slog.Logger
 	usecase subusecase.Usecase
@@ -25,6 +30,17 @@ func NewSubscriptionHandler(log *slog.Logger, usecase subusecase.Usecase) *Subsc
 	return &SubscriptionHandler{log: log, usecase: usecase}
 }
 
+// Create godoc
+// @Summary      Create subscription
+// @Description  Creates a new subscription record
+// @Tags         subscriptions
+// @Accept       json
+// @Produce      json
+// @Param        input body CreateSubscriptionRequest true "subscription body"
+// @Success      201  {object} SubscriptionResponse
+// @Failure      400  {object} ErrorResponse
+// @Failure      500  {object} ErrorResponse
+// @Router       /subs [post]
 func (h *SubscriptionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	const op = "handler.create"
 	var req CreateSubscriptionRequest
@@ -52,6 +68,17 @@ func (h *SubscriptionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, response)
 }
 
+// GetByID godoc
+// @Summary      Get subscription by ID
+// @Description  Returns a subscription by UUID
+// @Tags         subscriptions
+// @Produce      json
+// @Param        id path string true "Subscription ID (UUID)"
+// @Success      200  {object} SubscriptionResponse
+// @Failure      400  {object} ErrorResponse
+// @Failure      404  {object} ErrorResponse
+// @Failure      500  {object} ErrorResponse
+// @Router       /subs/{id} [get]
 func (h *SubscriptionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	const op = "handler.get_by_id"
 	id := r.PathValue("id")
@@ -67,6 +94,19 @@ func (h *SubscriptionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toSubscriptionResponse(sub))
 }
 
+// Update godoc
+// @Summary      Update subscription
+// @Description  Replaces a subscription (full update)
+// @Tags         subscriptions
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Subscription ID (UUID)"
+// @Param        input body UpdateSubscriptionRequest true "subscription body"
+// @Success      200  {object} SubscriptionResponse
+// @Failure      400  {object} ErrorResponse
+// @Failure      404  {object} ErrorResponse
+// @Failure      500  {object} ErrorResponse
+// @Router       /subs/{id} [put]
 func (h *SubscriptionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	const op = "handler.update"
 
@@ -99,6 +139,15 @@ func (h *SubscriptionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toSubscriptionResponse(updated))
 }
 
+// Delete godoc
+// @Summary      Delete subscription
+// @Description  Deletes a subscription by ID (idempotent)
+// @Tags         subscriptions
+// @Param        id path string true "Subscription ID (UUID)"
+// @Success      204
+// @Failure      400  {object} ErrorResponse
+// @Failure      500  {object} ErrorResponse
+// @Router       /subs/{id} [delete]
 func (h *SubscriptionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	const op = "handler.delete"
 
@@ -115,6 +164,19 @@ func (h *SubscriptionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// List godoc
+// @Summary      List subscriptions
+// @Description  Returns subscriptions with optional filters and pagination
+// @Tags         subscriptions
+// @Produce      json
+// @Param        user_id query string false "User ID (UUID)"
+// @Param        service_name query string false "Service name filter"
+// @Param        limit query int false "Page size (default 20, max 100)"
+// @Param        offset query int false "Offset (default 0)"
+// @Success      200  {array} SubscriptionResponse
+// @Failure      400  {object} ErrorResponse
+// @Failure      500  {object} ErrorResponse
+// @Router       /subs [get]
 func (h *SubscriptionHandler) List(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	subs, err := h.usecase.List(r.Context(), subusecase.ListInput{
@@ -130,6 +192,19 @@ func (h *SubscriptionHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toSubscriptionsResponse(subs))
 }
 
+// TotalCost godoc
+// @Summary      Total subscription cost
+// @Description  Sum of subscription prices for a period with optional filters
+// @Tags         subscriptions
+// @Produce      json
+// @Param        user_id query string false "User ID (UUID)"
+// @Param        service_name query string false "Service name filter"
+// @Param        period_from query string true "Period start (MM-YYYY)"
+// @Param        period_to query string true "Period end (MM-YYYY)"
+// @Success      200  {object} TotalCostResponse
+// @Failure      400  {object} ErrorResponse
+// @Failure      500  {object} ErrorResponse
+// @Router       /subs/total [get]
 func (h *SubscriptionHandler) TotalCost(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 

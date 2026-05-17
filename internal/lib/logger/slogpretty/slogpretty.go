@@ -108,6 +108,10 @@ func SetupPrettySlog() *slog.Logger {
 }
 
 func valueToJSON(v slog.Value) any {
+	if v.Kind() == slog.KindDuration {
+		return v.Duration().Milliseconds()
+	}
+
 	if v.Kind() == slog.KindAny {
 		anyValue := v.Any()
 		if err, ok := anyValue.(error); ok {

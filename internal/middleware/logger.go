@@ -19,7 +19,7 @@ func NewLogger(log *slog.Logger) func(http.Handler) http.Handler {
 				slog.Int("status", wrapper.StatusCode),
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
-				slog.Duration("duration", time.Since(start)),
+				slog.Int64("duration_ms", time.Since(start).Milliseconds()),
 			)
 		})
 	}
