@@ -27,6 +27,10 @@ type UpdateSubscriptionRequest struct {
 	EndDate     *string `json:"end_date"`
 }
 
+type TotalCostResponse struct {
+	Total int `json:"total"`
+}
+
 func toSubscriptionResponse(sub *subdomain.Subscription) SubscriptionResponse {
 	resp := SubscriptionResponse{
 		ID:          sub.ID.String(),
@@ -42,4 +46,12 @@ func toSubscriptionResponse(sub *subdomain.Subscription) SubscriptionResponse {
 	}
 
 	return resp
+}
+
+func toSubscriptionsResponse(subs []subdomain.Subscription) []SubscriptionResponse {
+	out := make([]SubscriptionResponse, 0, len(subs))
+	for i := range subs {
+		out = append(out, toSubscriptionResponse(&subs[i]))
+	}
+	return out
 }

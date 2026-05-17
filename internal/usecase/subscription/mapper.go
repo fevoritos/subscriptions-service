@@ -2,6 +2,7 @@ package subscription
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -75,4 +76,110 @@ func parseMonthYear(s string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("expected MM-YYYY: %w", err)
 	}
 	return t, nil
+}
+
+func parseSubscriptionID(id string) (subdomain.SubscriptionID, error) {
+	parsed, err := subdomain.ParseSubscriptionID(strings.TrimSpace(id))
+	if err != nil {
+		return subdomain.SubscriptionID{}, fmt.Errorf("id: %w", err)
+	}
+	return parsed, nil
+}
+
+func toListFilter(in ListInput) (subdomain.ListQuery, error) {
+	q := subdomain.ListQuery{}
+
+	if in.UserID != nil {
+		uid, err := subdomain.ParseID(strings.TrimSpace(*in.UserID))
+		if err != nil {
+			return subdomain.ListQuery{}, fmt.Errorf("user_id: %w", err)
+		}
+		q.UserID = &uid
+	}
+
+	if in.ServiceName != nil {
+		name := strings.TrimSpace(*in.ServiceName)
+		if name != "" {
+			q.ServiceName = &name
+		}
+	}
+
+	limit, err := parseNonNegativeInt(in.Limit, defaultListLimit)
+	if err != nil {
+		return subdomain.ListQuery{}, fmt.Errorf("limit: %w", err)
+	}
+	offset, err := parseNonNegativeInt(in.Offset, 0)
+	if err != nil {
+		return subdomain.ListQuery{}, fmt.Errorf("offset: %w", err)
+	}
+
+	q.Limit = clampLimit(limit)
+	q.Offset = offset
+
+	return q, nil
+}
+
+const defaultListLimit = 20
+const maxListLimit = 100
+
+func parseNonNegativeInt(raw string, defaultVal int) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return defaultVal, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		return 0, fmt.Errorf("must be a non-negative integer")
+	}
+	return n, nil
+}
+
+func clampLimit(n int) int {
+	if n <= 0 {
+		return defaultListLimit
+	}
+	if n > maxListLimit {
+		return maxListLimit
+	}
+	return n
+}
+
+func toTotalCostQuery(in TotalCostInput) (subdomain.TotalCostQuery, error) {
+	if strings.TrimSpace(in.PeriodFrom) == "" {
+		return subdomain.TotalCostQuery{}, fmt.Errorf("period_from is required")
+	}
+	if strings.TrimSpace(in.PeriodTo) == "" {
+		return subdomain.TotalCostQuery{}, fmt.Errorf("period_to is required")
+	}
+
+	from, err := parseMonthYear(in.PeriodFrom)
+	if err != nil {
+		return subdomain.TotalCostQuery{}, fmt.Errorf("period_from: %w", err)
+	}
+	to, err := parseMonthYear(in.PeriodTo)
+	if err != nil {
+		return subdomain.TotalCostQuery{}, fmt.Errorf("period_to: %w", err)
+	}
+
+	q := subdomain.TotalCostQuery{
+		PeriodFrom: from,
+		PeriodTo:   to,
+	}
+
+	if in.UserID != nil {
+		uid, err := subdomain.ParseID(strings.TrimSpace(*in.UserID))
+		if err != nil {
+			return subdomain.TotalCostQuery{}, fmt.Errorf("user_id: %w", err)
+		}
+		q.UserID = &uid
+	}
+
+	if in.ServiceName != nil {
+		name := strings.TrimSpace(*in.ServiceName)
+		if name != "" {
+			q.ServiceName = &name
+		}
+	}
+
+	return q, nil
 }

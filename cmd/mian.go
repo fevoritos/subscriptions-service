@@ -15,7 +15,7 @@ import (
 	"time"
 
 	infrastructurepostgres "subs-service/internal/infrastucture/postgres"
-	subrepo "subs-service/internal/reposotory/postgres"
+	subrepo "subs-service/internal/repository/postgres"
 	transporthttp "subs-service/internal/transport/http"
 )
 

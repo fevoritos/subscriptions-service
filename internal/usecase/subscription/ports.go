@@ -21,8 +21,8 @@ type Usecase interface {
 	GetByID(ctx context.Context, in GetByIDInput) (*subdomain.Subscription, error)
 	Update(ctx context.Context, in UpdateInput) (*subdomain.Subscription, error)
 	Delete(ctx context.Context, in DeleteInput) error
-	List(ctx context.Context, filter ListFilter) ([]subdomain.Subscription, error)
-	TotalCost(ctx context.Context, filter TotalCostFilter) (int, error)
+	List(ctx context.Context, filter ListInput) ([]subdomain.Subscription, error)
+	TotalCost(ctx context.Context, in TotalCostInput) (int, error)
 }
 
 type CreateInput struct {
@@ -59,6 +59,20 @@ type ListFilter struct {
 
 type TotalCostFilter struct {
 	UserID      string
+	ServiceName *string
+	PeriodFrom  string
+	PeriodTo    string
+}
+
+type ListInput struct {
+	UserID      *string
+	ServiceName *string
+	Limit       string
+	Offset      string
+}
+
+type TotalCostInput struct {
+	UserID      *string
 	ServiceName *string
 	PeriodFrom  string
 	PeriodTo    string

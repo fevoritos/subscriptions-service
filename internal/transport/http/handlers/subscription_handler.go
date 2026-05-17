@@ -5,13 +5,15 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	subdomain "subs-service/internal/domain"
 	subusecase "subs-service/internal/usecase/subscription"
 )
 
 var (
+	ErrBadRequest          = errors.New("invalid request")
+	ErrNotFound            = errors.New("resource not found")
 	ErrInternalServerError = errors.New("internal server error")
-	ErrInvalidUserID       = errors.New("invalid user id")
 )
 
 type SubscriptionHandler struct {
@@ -51,7 +53,18 @@ func (h *SubscriptionHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SubscriptionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	const op = "handler.get_by_id"
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.New("id is required"))
+		return
+	}
+	sub, err := h.usecase.GetByID(r.Context(), subusecase.GetByIDInput{ID: id})
+	if err != nil {
+		writeUsecaseError(w, h.log, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toSubscriptionResponse(sub))
 }
 
 func (h *SubscriptionHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -87,15 +100,59 @@ func (h *SubscriptionHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SubscriptionHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	const op = "handler.delete"
+
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.New("id is required"))
+		return
+	}
+
+	if err := h.usecase.Delete(r.Context(), subusecase.DeleteInput{ID: id}); err != nil {
+		writeUsecaseError(w, h.log, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *SubscriptionHandler) List(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	q := r.URL.Query()
+	subs, err := h.usecase.List(r.Context(), subusecase.ListInput{
+		UserID:      optionalQuery(q.Get("user_id")),
+		ServiceName: optionalQuery(q.Get("service_name")),
+		Limit:       q.Get("limit"),
+		Offset:      q.Get("offset"),
+	})
+	if err != nil {
+		writeUsecaseError(w, h.log, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toSubscriptionsResponse(subs))
 }
 
 func (h *SubscriptionHandler) TotalCost(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	q := r.URL.Query()
+
+	total, err := h.usecase.TotalCost(r.Context(), subusecase.TotalCostInput{
+		UserID:      optionalQuery(q.Get("user_id")),
+		ServiceName: optionalQuery(q.Get("service_name")),
+		PeriodFrom:  q.Get("period_from"),
+		PeriodTo:    q.Get("period_to"),
+	})
+	if err != nil {
+		writeUsecaseError(w, h.log, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, TotalCostResponse{Total: total})
+}
+
+func optionalQuery(v string) *string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return nil
+	}
+	return &v
 }
 
 func decodeJSON(r *http.Request, dst any) error {
@@ -124,9 +181,11 @@ func writeError(w http.ResponseWriter, status int, err error) {
 func writeUsecaseError(w http.ResponseWriter, log *slog.Logger, err error) {
 	switch {
 	case errors.Is(err, subdomain.ErrNotFound):
-		writeError(w, http.StatusNotFound, err)
+		log.Info("not found", slog.Any("err", err))
+		writeError(w, http.StatusNotFound, ErrNotFound)
 	case errors.Is(err, subusecase.ErrInvalidInput):
-		writeError(w, http.StatusBadRequest, err)
+		log.Warn("invalid input", slog.Any("err", err))
+		writeError(w, http.StatusBadRequest, ErrBadRequest)
 	default:
 		log.Error("usecase error", slog.Any("err", err))
 		writeError(w, http.StatusInternalServerError, ErrInternalServerError)

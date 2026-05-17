@@ -42,7 +42,22 @@ func (s *SubscriptionService) Create(ctx context.Context, in CreateInput) (*subd
 }
 
 func (s *SubscriptionService) GetByID(ctx context.Context, in GetByIDInput) (*subdomain.Subscription, error) {
-	return &subdomain.Subscription{}, nil
+	const op = "service.get_by_id"
+
+	id, err := parseSubscriptionID(in.ID)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, errors.Join(err, ErrInvalidInput))
+	}
+
+	sub, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, subdomain.ErrNotFound) {
+			return nil, fmt.Errorf("%s: %w", op, subdomain.ErrNotFound)
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return sub, nil
 }
 
 func (s *SubscriptionService) Update(ctx context.Context, in UpdateInput) (*subdomain.Subscription, error) {
@@ -69,15 +84,41 @@ func (s *SubscriptionService) Update(ctx context.Context, in UpdateInput) (*subd
 }
 
 func (s *SubscriptionService) Delete(ctx context.Context, in DeleteInput) error {
+	const op = "service.delete"
+
+	id, err := parseSubscriptionID(in.ID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, ErrInvalidInput)
+	}
+
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
 	return nil
 }
 
-func (s *SubscriptionService) List(ctx context.Context, filter ListFilter) ([]subdomain.Subscription, error) {
-	return []subdomain.Subscription{}, nil
+func (s *SubscriptionService) List(ctx context.Context, in ListInput) ([]subdomain.Subscription, error) {
+	const op = "service.list"
+
+	q, err := toListFilter(in)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, ErrInvalidInput)
+	}
+	return s.repo.List(ctx, q)
 }
 
-func (s *SubscriptionService) TotalCost(ctx context.Context, filter TotalCostFilter) (int, error) {
-	return 0, nil
+func (s *SubscriptionService) TotalCost(ctx context.Context, in TotalCostInput) (int, error) {
+	const op = "service.total_cost"
+
+	q, err := toTotalCostQuery(in)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", op, ErrInvalidInput)
+	}
+	if q.PeriodFrom.After(q.PeriodTo) {
+		return 0, fmt.Errorf("%s: %w", op, ErrInvalidInput)
+	}
+	return s.repo.TotalCost(ctx, q)
 }
 
 func validateSubscription(sub subdomain.Subscription) error {
