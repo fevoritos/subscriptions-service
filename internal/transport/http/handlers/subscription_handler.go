@@ -7,7 +7,6 @@ import (
 	"net/http"
 	subdomain "subs-service/internal/domain"
 	subusecase "subs-service/internal/usecase/subscription"
-	"time"
 )
 
 var (
@@ -33,35 +32,12 @@ func (h *SubscriptionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := subdomain.ParseID(req.UserID)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, ErrInvalidUserID)
-		return
-	}
-
-	startDate, err := time.Parse("01-2006", req.StartDate)
-	if err != nil {
-		h.log.Error(op, "error", err)
-		writeError(w, http.StatusBadRequest, errors.New("invalid start_date format, expected MM-YYYY"))
-		return
-	}
-
-	var endDate *time.Time
-	if req.EndDate != nil {
-		parsedEndDate, err := time.Parse("01-2006", *req.EndDate)
-		if err != nil {
-			h.log.Error(op, "error", err)
-			writeError(w, http.StatusBadRequest, errors.New("invalid end_date format, expected MM-YYYY"))
-			return
-		}
-		endDate = &parsedEndDate
-	}
-	sub := &subdomain.Subscription{
-		UserID:      userID,
+	sub := subusecase.CreateInput{
+		UserID:      req.UserID,
 		ServiceName: req.ServiceName,
 		Price:       req.Price,
-		StartDate:   startDate,
-		EndDate:     endDate,
+		StartDate:   req.StartDate,
+		EndDate:     req.EndDate,
 	}
 
 	created, err := h.usecase.Create(r.Context(), sub)
@@ -79,7 +55,35 @@ func (h *SubscriptionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SubscriptionHandler) Update(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	const op = "handler.update"
+
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.New("id is required"))
+		return
+	}
+
+	var req UpdateSubscriptionRequest
+	if err := decodeJSON(r, &req); err != nil {
+		h.log.Error(op, "error", err)
+		writeUsecaseError(w, h.log, subusecase.ErrInvalidInput)
+		return
+	}
+
+	updated, err := h.usecase.Update(r.Context(), subusecase.UpdateInput{
+		ID:          id,
+		UserID:      req.UserID,
+		ServiceName: req.ServiceName,
+		Price:       req.Price,
+		StartDate:   req.StartDate,
+		EndDate:     req.EndDate,
+	})
+	if err != nil {
+		writeUsecaseError(w, h.log, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, toSubscriptionResponse(updated))
 }
 
 func (h *SubscriptionHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +123,7 @@ func writeError(w http.ResponseWriter, status int, err error) {
 
 func writeUsecaseError(w http.ResponseWriter, log *slog.Logger, err error) {
 	switch {
-	case errors.Is(err, subusecase.ErrNotFound):
+	case errors.Is(err, subdomain.ErrNotFound):
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, subusecase.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, err)

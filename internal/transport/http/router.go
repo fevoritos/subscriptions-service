@@ -10,7 +10,7 @@ func NewRouter(subHandler *httphandlers.SubscriptionHandler) *http.ServeMux {
 
 	router.HandleFunc("POST /subs", subHandler.Create)
 	router.HandleFunc("GET /subs/{id}", subHandler.GetByID)
-	router.HandleFunc("PATCH /subs/{id}", subHandler.Update)
+	router.HandleFunc("PUT /subs/{id}", subHandler.Update)
 	router.HandleFunc("DELETE /subs/{id}", subHandler.Delete)
 	router.HandleFunc("GET /subs", subHandler.List)
 	router.HandleFunc("GET /subs/total", subHandler.TotalCost)
